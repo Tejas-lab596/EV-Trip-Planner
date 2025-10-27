@@ -1,0 +1,4 @@
+AWS Access ID-AKIARRGBQHTEBPQ2UQVK
+Access Secret Key-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
+Instance SSH Connect-ssh -i "tejas1.pem" ec2-user@ec2-13-232-216-227.ap-south-1.compute.amazonaws.com
+c6c882898a9e495d9916be51b5233c4f
