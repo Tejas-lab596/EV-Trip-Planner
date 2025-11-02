@@ -3,6 +3,9 @@ pipeline {
 
   environment {
     DOCKER_COMPOSE = 'docker compose'
+    // A second safeguard in case someone removes `name:` from compose:
+    COMPOSE_PROJECT_NAME = 'evtrip'
+
     DB_HOST     = credentials('rds-host')
     DB_PORT     = '3306'
     DB_USER     = credentials('rds-user')
@@ -11,15 +14,11 @@ pipeline {
     SECRET_KEY  = credentials('app-secret')
   }
 
-  options {
-    timestamps()
-  }
+  options { timestamps() }
 
   stages {
     stage('Checkout') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Prepare Docker') {
@@ -38,7 +37,7 @@ pipeline {
 
     stage('Deploy (Compose up)') {
       steps {
-        // write runtime env that Compose will mount into the backend container
+        // Write runtime env for backend
         sh '''
           mkdir -p backend
           cat > backend/.env <<EOF
@@ -50,14 +49,17 @@ DB_NAME=${DB_NAME}
 SECRET_KEY=${SECRET_KEY}
 EOF
         '''
-        sh "${DOCKER_COMPOSE} up -d --remove-orphans"
+        // Make deploy idempotent: stop old stack of the same project
+        sh "${DOCKER_COMPOSE} down --remove-orphans || true"
+        // Bring up fresh
+        sh "${DOCKER_COMPOSE} up -d --remove-orphans --force-recreate"
       }
     }
 
     stage('Smoke check') {
       steps {
-        // quick health probe inside the backend container
-        sh 'docker exec ev-backend sh -lc "curl -fsS http://localhost:5000/health"'
+        // Project name is fixed, container will be 'evtrip-backend-1'
+        sh 'docker exec $(docker ps --filter "name=evtrip-backend" --format "{{.ID}}") sh -lc "curl -fsS http://localhost:5000/health"'
       }
     }
   }
@@ -65,6 +67,8 @@ EOF
   post {
     success { echo '✅ Deployment completed successfully!' }
     failure { echo '❌ Deployment failed.' }
-    always  { sh 'docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"' }
+    always  {
+      sh 'docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"'
+    }
   }
 }
