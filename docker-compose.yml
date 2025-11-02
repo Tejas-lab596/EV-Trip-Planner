@@ -1,10 +1,11 @@
+name: evtrip          # stable compose project name (Compose v2 supports 'name:')
+
 services:
   backend:
     image: ev-trip-planner-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: ev-backend
     ports:
       - "5000:5000"
     env_file:
@@ -23,7 +24,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: ev-frontend
     ports:
       - "80:80"
     depends_on:
