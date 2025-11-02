@@ -13,11 +13,14 @@ pipeline {
 
   options {
     timestamps()
-    // ansiColor removed
   }
 
   stages {
-    stage('Checkout') { steps { checkout scm } }
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
 
     stage('Prepare Docker') {
       steps {
@@ -28,13 +31,17 @@ pipeline {
     }
 
     stage('Build images') {
-      steps { sh "docker compose build --pull" }
+      steps {
+        sh "${DOCKER_COMPOSE} build --pull"
+      }
     }
 
     stage('Deploy (Compose up)') {
       steps {
+        // write runtime env that Compose will mount into the backend container
         sh '''
-cat > backend/.env <<EOF
+          mkdir -p backend
+          cat > backend/.env <<EOF
 DB_HOST=${DB_HOST}
 DB_PORT=${DB_PORT}
 DB_USER=${DB_USER}
@@ -42,8 +49,15 @@ DB_PASSWORD=${DB_PASSWORD}
 DB_NAME=${DB_NAME}
 SECRET_KEY=${SECRET_KEY}
 EOF
-'''
-        sh "docker compose up -d --remove-orphans"
+        '''
+        sh "${DOCKER_COMPOSE} up -d --remove-orphans"
+      }
+    }
+
+    stage('Smoke check') {
+      steps {
+        // quick health probe inside the backend container
+        sh 'docker exec ev-backend sh -lc "curl -fsS http://localhost:5000/health"'
       }
     }
   }
